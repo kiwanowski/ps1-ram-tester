@@ -33,8 +33,8 @@ extern uint8_t spuRAMAddressShift;
 void initSPU(void);
 void waitForSPUDMADone(void);
 
-void sendSPURAMData(const void *data, int offset, size_t length);
-void receiveSPURAMData(void *data, int offset, size_t length);
+void sendSPURAMData(const void *data, unsigned int offset, size_t length);
+void receiveSPURAMData(void *data, unsigned int offset, size_t length);
 
 void stopAllSPUChannels(void);
 int findFreeSPUChannel(void);

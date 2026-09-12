@@ -26,6 +26,8 @@
 #include "ps1/gpucmd.h"
 #include "ps1/registers.h"
 
+#define SCREEN_HRES   GP1_HRES_320
+#define SCREEN_VRES   GP1_VRES_256
 #define SCREEN_WIDTH  320
 #define SCREEN_HEIGHT 240
 
@@ -39,14 +41,11 @@ int main(int argc, const char **argv) {
 	LOG("ps1-ram-tester " VERSION_STRING " (" __DATE__ " " __TIME__ ")");
 	LOG("(C) 2026 spicyjpeg");
 
-	if ((GPU_GP1 & GP1_STAT_FB_MODE_BITMASK) == GP1_STAT_FB_MODE_PAL) {
-		LOG("using PAL mode");
-		setupGPU(GP1_MODE_PAL, SCREEN_WIDTH, SCREEN_HEIGHT);
-	} else {
-		LOG("using NTSC mode");
-		setupGPU(GP1_MODE_NTSC, SCREEN_WIDTH, SCREEN_HEIGHT);
-	}
+	GP1VideoMode mode = getCurrentVideoMode();
 
+	LOG("using %s mode", (mode == GP1_MODE_PAL) ? "PAL" : "NTSC");
+
+	setupGPU(mode, SCREEN_HRES, SCREEN_VRES, SCREEN_WIDTH, SCREEN_HEIGHT);
 	initSPU();
 	initControllerBus();
 	fixRetailRAMConfig();

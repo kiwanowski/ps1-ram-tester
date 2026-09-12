@@ -1,5 +1,5 @@
 /*
- * ps1-bare-metal - (C) 2023-2025 spicyjpeg
+ * ps1-bare-metal - (C) 2023-2026 spicyjpeg
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "common/gpu.h"
 #include "ps1/gpucmd.h"
@@ -23,12 +24,15 @@
 
 #define DMA_MAX_CHUNK_SIZE 16
 
-void setupGPU(GP1VideoMode mode, int width, int height) {
+void setupGPU(
+	GP1VideoMode     mode,
+	GP1HorizontalRes horizontalRes,
+	GP1VerticalRes   verticalRes,
+	unsigned int     width,
+	unsigned int     height
+) {
 	int x = 0x760;
 	int y = (mode == GP1_MODE_PAL) ? 0xa3 : 0x88;
-
-	GP1HorizontalRes horizontalRes = GP1_HRES_320;
-	GP1VerticalRes   verticalRes   = GP1_VRES_256;
 
 	int offsetX = (width  * gp1_clockMultiplierH(horizontalRes)) / 2;
 	int offsetY = (height / gp1_clockDividerV(verticalRes))      / 2;
@@ -40,17 +44,22 @@ void setupGPU(GP1VideoMode mode, int width, int height) {
 		horizontalRes,
 		verticalRes,
 		mode,
-		false,
+		verticalRes == GP1_VRES_512,
 		GP1_COLOR_16BPP
 	);
 	GPU_GP1 = gp1_dispBlank(false);
 
-	DMA_DPCR         |= DMA_DPCR_CH_ENABLE(DMA_GPU);
+	IRQ_MASK &= ~(1 << IRQ_VSYNC);
+
+	DMA_DPCR         |= 0
+		| DMA_DPCR_CH_ENABLE(DMA_GPU)
+		| DMA_DPCR_CH_ENABLE(DMA_OTC);
 	DMA_CHCR(DMA_GPU) = 0;
+	DMA_CHCR(DMA_OTC) = 0;
 }
 
 void waitForGP0Ready(void) {
-	while (!(GPU_GP1 & GP1_STAT_CMD_READY))
+	while (!(GPU_GP1 & GP1_STAT_WRITE_READY))
 		__asm__ volatile("");
 }
 
@@ -68,11 +77,11 @@ void waitForVSync(void) {
 
 void sendGPULinkedList(const void *data) {
 	waitForGPUDMADone();
-	assert(!((uint32_t) data % 4));
+	assert(!((uintptr_t) data % 4));
 
 	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_WRITE);
 
-	DMA_MADR(DMA_GPU) = (uint32_t) data;
+	DMA_MADR(DMA_GPU) = (uintptr_t) data;
 	DMA_CHCR(DMA_GPU) = 0
 		| DMA_CHCR_WRITE
 		| DMA_CHCR_MODE_LIST
@@ -80,14 +89,14 @@ void sendGPULinkedList(const void *data) {
 }
 
 void sendVRAMData(
-	const void *data,
-	int        x,
-	int        y,
-	int        width,
-	int        height
+	const void   *data,
+	unsigned int x,
+	unsigned int y,
+	unsigned int width,
+	unsigned int height
 ) {
 	waitForGPUDMADone();
-	assert(!((uint32_t) data % 4));
+	assert(!((uintptr_t) data % 4));
 
 	size_t length = (width * height + 1) / 2;
 	size_t chunkSize, numChunks;
@@ -111,7 +120,7 @@ void sendVRAMData(
 
 	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_WRITE);
 
-	DMA_MADR(DMA_GPU) = (uint32_t) data;
+	DMA_MADR(DMA_GPU) = (uintptr_t) data;
 	DMA_BCR (DMA_GPU) = chunkSize | (numChunks << 16);
 	DMA_CHCR(DMA_GPU) = 0
 		| DMA_CHCR_WRITE
@@ -120,14 +129,14 @@ void sendVRAMData(
 }
 
 void receiveVRAMData(
-	void *data,
-	int  x,
-	int  y,
-	int  width,
-	int  height
+	void         *data,
+	unsigned int x,
+	unsigned int y,
+	unsigned int width,
+	unsigned int height
 ) {
 	waitForGPUDMADone();
-	assert(!((uint32_t) data % 4));
+	assert(!((uintptr_t) data % 4));
 
 	size_t length = (width * height + 1) / 2;
 	size_t chunkSize, numChunks;
@@ -151,7 +160,7 @@ void receiveVRAMData(
 
 	GPU_GP1 = gp1_dmaRequestMode(GP1_DREQ_GP0_READ);
 
-	DMA_MADR(DMA_GPU) = (uint32_t) data;
+	DMA_MADR(DMA_GPU) = (uintptr_t) data;
 	DMA_BCR (DMA_GPU) = chunkSize | (numChunks << 16);
 	DMA_CHCR(DMA_GPU) = 0
 		| DMA_CHCR_READ
@@ -159,8 +168,22 @@ void receiveVRAMData(
 		| DMA_CHCR_ENABLE;
 }
 
-uint32_t *allocateGP0Packet(GPUDMAChain *chain, int numCommands) {
-	assert((numCommands >= 0) && (numCommands <= DMA_MAX_CHUNK_SIZE));
+void clearOrderingTable(uint32_t *table, size_t numEntries) {
+	DMA_MADR(DMA_OTC) = (uintptr_t) &table[numEntries - 1];
+	DMA_BCR (DMA_OTC) = numEntries;
+	DMA_CHCR(DMA_OTC) = 0
+		| DMA_CHCR_READ
+		| DMA_CHCR_REVERSE
+		| DMA_CHCR_MODE_BURST
+		| DMA_CHCR_ENABLE
+		| DMA_CHCR_TRIGGER;
+
+	while (DMA_CHCR(DMA_OTC) & DMA_CHCR_ENABLE)
+		__asm__ volatile("");
+}
+
+uint32_t *allocateGP0Packet(GPUDMAChain *chain, size_t numCommands) {
+	assert(numCommands <= DMA_MAX_CHUNK_SIZE);
 
 	uint32_t *ptr      = chain->nextPacket;
 	chain->nextPacket += numCommands + 1;
@@ -171,13 +194,32 @@ uint32_t *allocateGP0Packet(GPUDMAChain *chain, int numCommands) {
 	return &ptr[1];
 }
 
+uint32_t *allocateOrderedGP0Packet(
+	GPUOrderedDMAChain *chain,
+	unsigned int       zIndex,
+	size_t             numCommands
+) {
+	assert(numCommands <= DMA_MAX_CHUNK_SIZE);
+	assert(zIndex      <  GPU_ORDERING_TABLE_SIZE);
+
+	uint32_t *ptr      = chain->nextPacket;
+	chain->nextPacket += numCommands + 1;
+
+	*ptr = gp0_tag(numCommands, (void *) chain->orderingTable[zIndex]);
+	chain->orderingTable[zIndex] = gp0_tag(0, ptr);
+
+	assert(chain->nextPacket < &(chain->data)[GPU_CHAIN_BUFFER_SIZE]);
+
+	return &ptr[1];
+}
+
 void uploadTexture(
-	TextureInfo *info,
-	const void  *data,
-	int         x,
-	int         y,
-	int         width,
-	int         height
+	TextureInfo  *info,
+	const void   *data,
+	unsigned int x,
+	unsigned int y,
+	unsigned int width,
+	unsigned int height
 ) {
 	assert((width <= 256) && (height <= 256));
 
@@ -202,22 +244,22 @@ void uploadIndexedTexture(
 	TextureInfo   *info,
 	const void    *image,
 	const void    *palette,
-	int           imageX,
-	int           imageY,
-	int           paletteX,
-	int           paletteY,
-	int           width,
-	int           height,
+	unsigned int  imageX,
+	unsigned int  imageY,
+	unsigned int  paletteX,
+	unsigned int  paletteY,
+	unsigned int  width,
+	unsigned int  height,
 	GP0ColorDepth colorDepth
 ) {
 	assert((width <= 256) && (height <= 256));
 
 	int numColors    = (colorDepth == GP0_COLOR_8BPP) ? 256 : 16;
-	int widthDivider = (colorDepth == GP0_COLOR_8BPP) ?   2 :  4;
+	int widthDivider = (colorDepth == GP0_COLOR_8BPP) ?   1 :  2;
 
 	assert(!(paletteX % 16) && ((paletteX + numColors) <= 1024));
 
-	sendVRAMData(image, imageX, imageY, width / widthDivider, height);
+	sendVRAMData(image, imageX, imageY, width >> widthDivider, height);
 	waitForGPUDMADone();
 	sendVRAMData(palette, paletteX, paletteY, numColors, 1);
 	waitForGPUDMADone();
@@ -230,8 +272,8 @@ void uploadIndexedTexture(
 		colorDepth
 	);
 	info->clut   = gp0_clut(paletteX / 16, paletteY);
-	info->u      = (uint8_t)  ((imageX %  64) * widthDivider);
-	info->v      = (uint8_t)   (imageY % 256);
+	info->u      = (uint8_t)  ((imageX %  64) << widthDivider);
+	info->v      = (uint8_t)  (imageY  % 256);
 	info->width  = (uint16_t) width;
 	info->height = (uint16_t) height;
 }

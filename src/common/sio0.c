@@ -44,6 +44,8 @@ void initControllerBus(void) {
 		| SIO_CTRL_TX_ENABLE
 		| SIO_CTRL_RX_ENABLE
 		| SIO_CTRL_DSR_IRQ_ENABLE;
+
+	IRQ_MASK &= ~(1 << IRQ_SIO0);
 }
 
 static bool waitForAcknowledge(int timeout) {

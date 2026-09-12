@@ -26,15 +26,13 @@ typedef void (*Function)(void);
 // to turn them into pointers is to declare them as arrays.
 extern char _bssStart[], _bssEnd[];
 
-extern const Function _preinitArrayStart[], _preinitArrayEnd[];
-extern const Function _initArrayStart[],    _initArrayEnd[];
-extern const Function _finiArrayStart[],    _finiArrayEnd[];
+extern const Function _initArrayStart[], _initArrayEnd[];
+extern const Function _finiArrayStart[], _finiArrayEnd[];
 
 /* Heap API (used by malloc) */
 
 #define ALIGN(x, n) (((x) + ((n) - 1)) & ~((n) - 1))
 
-#if 0
 static uintptr_t _heapEnd   = (uintptr_t) _bssEnd;
 static uintptr_t _heapLimit = 0x80200000; // TODO: add a way to change this
 
@@ -48,7 +46,6 @@ void *sbrk(ptrdiff_t incr) {
 	_heapEnd = newEnd;
 	return (void *) currentEnd;
 }
-#endif
 
 /* Program entry point */
 
@@ -65,8 +62,6 @@ int _start(int argc, const char **argv) {
 
 	// Invoke all global constructors if any, then main() and finally all global
 	// destructors.
-	for (const Function *ctor = _preinitArrayStart; ctor < _preinitArrayEnd; ctor++)
-		(*ctor)();
 	for (const Function *ctor = _initArrayStart; ctor < _initArrayEnd; ctor++)
 		(*ctor)();
 

@@ -22,6 +22,9 @@
 
 #define DMA_MAX_CHUNK_SIZE 16
 
+// This version of spu.c was modified from the one in ps1-bare-metal to make the
+// SPU RAM addressing unit configurable at runtime, in order to support SPU RAM
+// sizes larger than 512 KB.
 uint8_t spuRAMAddressShift = 3;
 
 static void delayMicroseconds(int time) {
@@ -83,9 +86,9 @@ void waitForSPUDMADone(void) {
 	delayMicroseconds(35);
 }
 
-void sendSPURAMData(const void *data, int offset, size_t length) {
+void sendSPURAMData(const void *data, unsigned int offset, size_t length) {
 	waitForSPUDMADone();
-	assert(!((uint32_t) data % 4));
+	assert(!((uintptr_t) data % 4));
 	assert(!(offset % (1 << spuRAMAddressShift)));
 
 	length = (length + 3) / 4;
@@ -107,13 +110,13 @@ void sendSPURAMData(const void *data, int offset, size_t length) {
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_NONE)
 		__asm__ volatile("");
 
-	SPU_TSA  = offset >> spuRAMAddressShift;
+	SPU_TSA  = (uint16_t) (offset >> spuRAMAddressShift);
 	SPU_ATTR = ctrl | SPU_ATTR_XFER_DMA_WRITE;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_DMA_WRITE)
 		__asm__ volatile("");
 
-	DMA_MADR(DMA_SPU) = (uint32_t) data;
+	DMA_MADR(DMA_SPU) = (uintptr_t) data;
 	DMA_BCR (DMA_SPU) = chunkSize | (numChunks << 16);
 	DMA_CHCR(DMA_SPU) = 0
 		| DMA_CHCR_WRITE
@@ -121,9 +124,9 @@ void sendSPURAMData(const void *data, int offset, size_t length) {
 		| DMA_CHCR_ENABLE;
 }
 
-void receiveSPURAMData(void *data, int offset, size_t length) {
+void receiveSPURAMData(void *data, unsigned int offset, size_t length) {
 	waitForSPUDMADone();
-	assert(!((uint32_t) data % 4));
+	assert(!((uintptr_t) data % 4));
 	assert(!(offset % (1 << spuRAMAddressShift)));
 
 	length = (length + 3) / 4;
@@ -145,13 +148,13 @@ void receiveSPURAMData(void *data, int offset, size_t length) {
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_NONE)
 		__asm__ volatile("");
 
-	SPU_TSA  = offset >> spuRAMAddressShift;
+	SPU_TSA  = (uint16_t) (offset >> spuRAMAddressShift);
 	SPU_ATTR = ctrl | SPU_ATTR_XFER_DMA_READ;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_DMA_READ)
 		__asm__ volatile("");
 
-	DMA_MADR(DMA_SPU) = (uint32_t) data;
+	DMA_MADR(DMA_SPU) = (uintptr_t) data;
 	DMA_BCR (DMA_SPU) = chunkSize | (numChunks << 16);
 	DMA_CHCR(DMA_SPU) = 0
 		| DMA_CHCR_READ

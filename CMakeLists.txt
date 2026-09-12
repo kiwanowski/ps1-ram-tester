@@ -31,7 +31,7 @@ include(cmake/tools.cmake)
 ## Standard library
 
 add_library(
-	common OBJECT
+	c OBJECT
 	src/libc/clz.s
 	#src/libc/crt0.c
 	src/libc/misc.c
@@ -41,11 +41,11 @@ add_library(
 	src/vendor/printf.c
 )
 target_include_directories(
-	common PUBLIC
+	c PUBLIC
 	src
 	src/libc
 )
-link_libraries(common)
+link_libraries(c)
 
 ## Main executable
 
