@@ -27,7 +27,8 @@ memory but do not explicitly initialize the DRAM controller.
 Finally, this tester serves as a practical example of a simple C application
 built on top of the
 [ps1-bare-metal](https://github.com/spicyjpeg/ps1-bare-metal) headers and build
-system.
+system. *As with ps1-bare-metal itself, all code and assets in this repository*
+*are human-authored with no assistance from LLMs or generative AI whatsoever.*
 
 ## Download and usage
 

@@ -16,51 +16,25 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include "ps1/registers.h"
 
-#define DEF(type) static inline type __attribute__((always_inline))
+#define DEF(type)     static inline type __attribute__((always_inline))
+#define DIV(num, den) (((num) + (den) / 2) / (den))
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-DEF(int) abs(int value) {
-	return (value < 0) ? (-value) : value;
-}
-DEF(long) labs(long value) {
-	return (value < 0) ? (-value) : value;
-}
-
-// crt0.c
-void *sbrk(ptrdiff_t incr);
-
-// malloc.c
-void *malloc(size_t size);
-void *calloc(size_t num, size_t size);
-void *realloc(void *ptr, size_t size);
-void free(void *ptr);
-
-// misc.c
-void abort(void);
-
-// string.c
-long long strtoll(
-	const char *__restrict str,
-	char **__restrict      strEnd,
-	int                    base
-);
-
-DEF(long) strtol(
-	const char *__restrict str,
-	char **__restrict      strEnd,
-	int                    base
-) {
-	return (long) strtoll(str, strEnd, base);
+DEF(void) delayCycles(int time) {
+	__asm__ volatile(
+		".set push\n"
+		".set noreorder\n"
+		"bgtz  %0, .\n"
+		"addiu %0, -2\n"
+		".set pop\n"
+		: "+r"(time)
+	);
 }
 
-#ifdef __cplusplus
+DEF(void) delayMicroseconds(int time) {
+	delayCycles(DIV(time * DIV(F_CPU * 8, 1000000), 8));
 }
-#endif
 
 #undef DEF
+#undef DIV

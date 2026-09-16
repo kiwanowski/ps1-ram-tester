@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common/spu.h"
+#include "ps1/delay.h"
 #include "ps1/registers.h"
 
 #define DMA_MAX_CHUNK_SIZE 16
@@ -27,29 +28,16 @@
 // sizes larger than 512 KB.
 uint8_t spuRAMAddressShift = 3;
 
-static void delayMicroseconds(int time) {
-	time = ((time * 271) + 4) / 8;
-
-	__asm__ volatile(
-		".set push\n"
-		".set noreorder\n"
-		"bgtz  %0, .\n"
-		"addiu %0, -2\n"
-		".set pop\n"
-		: "+r"(time)
-	);
-}
-
 void initSPU(void) {
 	BIU_DEV4_CTRL = 0
-		| ( 1 << 0) // Write delay
-		| (14 << 4) // Read delay
+		| BIU_CTRL_WRITE_DELAY(1)
+		| BIU_CTRL_READ_DELAY(14)
 		| BIU_CTRL_RECOVERY
 		| BIU_CTRL_WIDTH_16
 		| BIU_CTRL_AUTO_INCR
-		| (9 << 16) // Number of address lines
-		| (2 << 24) // DMA read/write delay (required for SPU RAM readback)
-		| BIU_CTRL_DMA_DELAY;
+		| BIU_CTRL_ADDR_BITS(9)
+		| BIU_CTRL_DMA_DELAY(2) // Required for SPU RAM readback
+		| BIU_CTRL_DMA_DELAY_ENABLE;
 
 	SPU_ATTR = 0;
 

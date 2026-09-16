@@ -95,12 +95,12 @@ static void performFastReboot(void) {
 	// the BIOS from successfully reading the magic string from one if present,
 	// thus disabling any cartridge hooks that may interfere with ours.
 	BIU_DEV0_CTRL = 0
-		| (15 << 0) // Write delay
-		| ( 3 << 4) // Read delay
+		| BIU_CTRL_WRITE_DELAY(15)
+		| BIU_CTRL_READ_DELAY(3)
 		| BIU_CTRL_FLOAT
 		| BIU_CTRL_WIDTH_16
 		| BIU_CTRL_AUTO_INCR
-		| (19 << 16); // Number of address lines
+		| BIU_CTRL_ADDR_BITS(19);
 
 	// Once the breakpoint is configured, jump to the middle of the BIOS entry
 	// point in order to skip the aforementioned initialization code.

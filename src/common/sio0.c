@@ -18,32 +18,20 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common/sio0.h"
+#include "ps1/delay.h"
 #include "ps1/registers.h"
 
-static void delayMicroseconds(int time) {
-	time = ((time * 271) + 4) / 8;
-
-	__asm__ volatile(
-		".set push\n"
-		".set noreorder\n"
-		"bgtz  %0, .\n"
-		"addiu %0, -2\n"
-		".set pop\n"
-		: "+r"(time)
-	);
-}
-
 void initControllerBus(void) {
-	SIO_CTRL(0) = SIO_CTRL_RESET;
+	SIO_CR(0) = SIO_CR_INTRST;
 
-	SIO_MODE(0) = 0
-		| SIO_MODE_BAUD_DIV1
-		| SIO_MODE_DATA_8;
-	SIO_BAUD(0) = F_CPU / 250000;
-	SIO_CTRL(0) = 0
-		| SIO_CTRL_TX_ENABLE
-		| SIO_CTRL_RX_ENABLE
-		| SIO_CTRL_DSR_IRQ_ENABLE;
+	SIO_MR(0) = 0
+		| SIO_MR_BR_DIV1
+		| SIO_MR_CHLEN_8;
+	SIO_BR(0) = F_CPU / 250000;
+	SIO_CR(0) = 0
+		| SIO_CR_TXEN
+		| SIO_CR_RXEN
+		| SIO_CR_DSRIEN;
 
 	IRQ_MASK &= ~(1 << IRQ_SIO0);
 }
@@ -51,8 +39,8 @@ void initControllerBus(void) {
 static bool waitForAcknowledge(int timeout) {
 	for (; timeout > 0; timeout -= 10) {
 		if (IRQ_STAT & (1 << IRQ_SIO0)) {
-			IRQ_STAT     = ~(1 << IRQ_SIO0);
-			SIO_CTRL(0) |= SIO_CTRL_ACKNOWLEDGE;
+			IRQ_STAT   = ~(1 << IRQ_SIO0);
+			SIO_CR(0) |= SIO_CR_ERRRST;
 
 			return true;
 		}
@@ -67,22 +55,20 @@ static bool waitForAcknowledge(int timeout) {
 #define DSR_TIMEOUT 120
 
 void selectControllerPort(int port) {
-	if (port)
-		SIO_CTRL(0) |= SIO_CTRL_CS_PORT_2;
-	else
-		SIO_CTRL(0) &= ~SIO_CTRL_CS_PORT_2;
+	uint16_t cr = port ? SIO_CR_PORT_2 : SIO_CR_PORT_1;
+	SIO_CR(0)   = (SIO_CR(0) & ~SIO_CR_PORT_BITMASK) | cr;
 }
 
 static uint8_t exchangeByte(uint8_t value) {
-	while (!(SIO_STAT(0) & SIO_STAT_TX_NOT_FULL))
+	while (!(SIO_SR(0) & SIO_SR_TXRDY))
 		__asm__ volatile("");
 
-	SIO_DATA(0) = value;
+	SIO_DR(0) = value;
 
-	while (!(SIO_STAT(0) & SIO_STAT_RX_NOT_EMPTY))
+	while (!(SIO_SR(0) & SIO_SR_RXRDY))
 		__asm__ volatile("");
 
-	return SIO_DATA(0);
+	return SIO_DR(0);
 }
 
 size_t exchangeSIO0Packet(
@@ -92,17 +78,17 @@ size_t exchangeSIO0Packet(
 	size_t            reqLength,
 	size_t            maxRespLength
 ) {
-	IRQ_STAT     = ~(1 << IRQ_SIO0);
-	SIO_CTRL(0) |= SIO_CTRL_DTR | SIO_CTRL_ACKNOWLEDGE;
+	IRQ_STAT   = ~(1 << IRQ_SIO0);
+	SIO_CR(0) |= SIO_CR_DTR | SIO_CR_ERRRST;
 	delayMicroseconds(DTR_DELAY);
 
 	size_t respLength = 0;
 
-	SIO_DATA(0) = address;
+	SIO_DR(0) = address;
 
 	if (waitForAcknowledge(DSR_TIMEOUT)) {
-		while (SIO_STAT(0) & SIO_STAT_RX_NOT_EMPTY)
-			SIO_DATA(0);
+		while (SIO_SR(0) & SIO_SR_RXRDY)
+			SIO_DR(0);
 
 		while (respLength < maxRespLength) {
 			if (reqLength > 0) {
@@ -121,7 +107,7 @@ size_t exchangeSIO0Packet(
 	}
 
 	delayMicroseconds(DTR_DELAY);
-	SIO_CTRL(0) &= ~SIO_CTRL_DTR;
+	SIO_CR(0) &= ~SIO_CR_DTR;
 
 	return respLength;
 }

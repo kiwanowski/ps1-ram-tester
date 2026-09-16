@@ -18,10 +18,10 @@
 
 #include <stdint.h>
 
-#define _ADDR8(addr)  ((volatile uint8_t *) (addr))
+#define _ADDR8(addr)  ((volatile uint8_t  *) (addr))
 #define _ADDR16(addr) ((volatile uint16_t *) (addr))
 #define _ADDR32(addr) ((volatile uint32_t *) (addr))
-#define _MMIO8(addr)  (*_ADDR8(addr))
+#define _MMIO8(addr)  (*_ADDR8 (addr))
 #define _MMIO16(addr) (*_ADDR16(addr))
 #define _MMIO32(addr) (*_ADDR32(addr))
 
@@ -54,13 +54,18 @@ typedef enum {
 	BIU_CTRL_WIDTH_8             =  0 << 12,
 	BIU_CTRL_WIDTH_16            =  1 << 12,
 	BIU_CTRL_AUTO_INCR           =  1 << 13,
-	BIU_CTRL_SIZE_BITMASK        = 31 << 16,
+	BIU_CTRL_ADDR_BITS_BITMASK   = 31 << 16,
 	BIU_CTRL_DMA_DELAY_BITMASK   = 15 << 24,
 	BIU_CTRL_ADDR_ERROR          =  1 << 28,
-	BIU_CTRL_DMA_DELAY           =  1 << 29,
+	BIU_CTRL_DMA_DELAY_ENABLE    =  1 << 29,
 	BIU_CTRL_DMA32               =  1 << 30,
 	BIU_CTRL_WAIT                =  1 << 31
 } BIUControlFlag;
+
+#define BIU_CTRL_WRITE_DELAY(value) (((value) & 15) <<  0)
+#define BIU_CTRL_READ_DELAY(value)  (((value) & 15) <<  4)
+#define BIU_CTRL_ADDR_BITS(value)   (((value) & 31) << 16)
+#define BIU_CTRL_DMA_DELAY(value)   (((value) & 15) << 24)
 
 #define BIU_DEV0_ADDR _MMIO32(IO_BASE | 0x000) // PIO/arcade
 #define BIU_DEV8_ADDR _MMIO32(IO_BASE | 0x004) // PIO/debug
@@ -75,61 +80,67 @@ typedef enum {
 /* Serial interfaces */
 
 typedef enum {
-	SIO_STAT_TX_NOT_FULL   = 1 << 0,
-	SIO_STAT_RX_NOT_EMPTY  = 1 << 1,
-	SIO_STAT_TX_EMPTY      = 1 << 2,
-	SIO_STAT_RX_PARITY_ERR = 1 << 3,
-	SIO_STAT_RX_OVERRUN    = 1 << 4, // SIO1 only
-	SIO_STAT_RX_STOP_ERR   = 1 << 5, // SIO1 only
-	SIO_STAT_RX_INVERT     = 1 << 6, // SIO1 only
-	SIO_STAT_DSR           = 1 << 7, // DSR is /ACK on SIO0
-	SIO_STAT_CTS           = 1 << 8, // SIO1 only
-	SIO_STAT_IRQ           = 1 << 9
-} SIOStatusFlag;
+	SIO_SR_TXRDY  = 1 << 0,
+	SIO_SR_RXRDY  = 1 << 1,
+	SIO_SR_TXU    = 1 << 2,
+	SIO_SR_PERROR = 1 << 3,
+	SIO_SR_OE     = 1 << 4, // SIO1 only
+	SIO_SR_FE     = 1 << 5, // SIO1 only
+	SIO_SR_BRK    = 1 << 6, // SIO1 only
+	SIO_SR_DSR    = 1 << 7, // DSR is /ACK on SIO0
+	SIO_SR_CTS    = 1 << 8, // SIO1 only
+	SIO_SR_IRQ    = 1 << 9
+} SIOSRFlag;
 
 typedef enum {
-	SIO_MODE_BAUD_BITMASK   = 3 << 0,
-	SIO_MODE_BAUD_DIV1      = 1 << 0,
-	SIO_MODE_BAUD_DIV16     = 2 << 0,
-	SIO_MODE_BAUD_DIV64     = 3 << 0,
-	SIO_MODE_DATA_BITMASK   = 3 << 2,
-	SIO_MODE_DATA_5         = 0 << 2,
-	SIO_MODE_DATA_6         = 1 << 2,
-	SIO_MODE_DATA_7         = 2 << 2,
-	SIO_MODE_DATA_8         = 3 << 2,
-	SIO_MODE_PARITY_BITMASK = 3 << 4,
-	SIO_MODE_PARITY_NONE    = 0 << 4,
-	SIO_MODE_PARITY_EVEN    = 1 << 4,
-	SIO_MODE_PARITY_ODD     = 3 << 4,
-	SIO_MODE_STOP_BITMASK   = 3 << 6, // SIO1 only
-	SIO_MODE_STOP_1         = 1 << 6, // SIO1 only
-	SIO_MODE_STOP_1_5       = 2 << 6, // SIO1 only
-	SIO_MODE_STOP_2         = 3 << 6, // SIO1 only
-	SIO_MODE_SCK_INVERT     = 1 << 8  // SIO0 only
-} SIOModeFlag;
+	SIO_MR_BR_BITMASK    = 3 << 0,
+	SIO_MR_BR_DIV1       = 1 << 0,
+	SIO_MR_BR_DIV16      = 2 << 0,
+	SIO_MR_BR_DIV64      = 3 << 0,
+	SIO_MR_CHLEN_BITMASK = 3 << 2,
+	SIO_MR_CHLEN_5       = 0 << 2,
+	SIO_MR_CHLEN_6       = 1 << 2,
+	SIO_MR_CHLEN_7       = 2 << 2,
+	SIO_MR_CHLEN_8       = 3 << 2,
+	SIO_MR_P_BITMASK     = 3 << 4,
+	SIO_MR_P_NONE        = 0 << 4,
+	SIO_MR_P_EVEN        = 1 << 4,
+	SIO_MR_P_ODD         = 3 << 4,
+	SIO_MR_SB_BITMASK    = 3 << 6, // SIO1 only
+	SIO_MR_SB_1          = 1 << 6, // SIO1 only
+	SIO_MR_SB_1_5        = 2 << 6, // SIO1 only
+	SIO_MR_SB_2          = 3 << 6, // SIO1 only
+	SIO_MR_CPOL          = 1 << 8  // SIO0 only
+} SIOMRFlag;
 
 typedef enum {
-	SIO_CTRL_TX_ENABLE      = 1 <<  0,
-	SIO_CTRL_DTR            = 1 <<  1, // DTR is /CS on SIO0
-	SIO_CTRL_RX_ENABLE      = 1 <<  2,
-	SIO_CTRL_TX_INVERT      = 1 <<  3, // SIO1 only
-	SIO_CTRL_ACKNOWLEDGE    = 1 <<  4,
-	SIO_CTRL_RTS            = 1 <<  5, // SIO1 only
-	SIO_CTRL_RESET          = 1 <<  6,
-	SIO_CTRL_TX_IRQ_ENABLE  = 1 << 10,
-	SIO_CTRL_RX_IRQ_ENABLE  = 1 << 11,
-	SIO_CTRL_DSR_IRQ_ENABLE = 1 << 12, // DSR is /ACK on SIO0
-	SIO_CTRL_CS_PORT_1      = 0 << 13, // SIO0 only
-	SIO_CTRL_CS_PORT_2      = 1 << 13  // SIO0 only
-} SIOControlFlag;
+	SIO_CR_TXEN          = 1 <<  0,
+	SIO_CR_DTR           = 1 <<  1, // DTR is /CS on SIO0
+	SIO_CR_RXEN          = 1 <<  2,
+	SIO_CR_BRK           = 1 <<  3, // SIO1 only
+	SIO_CR_ERRRST        = 1 <<  4,
+	SIO_CR_RTS           = 1 <<  5, // SIO1 only
+	SIO_CR_INTRST        = 1 <<  6,
+	SIO_CR_BUFSZ_BITMASK = 3 <<  8,
+	SIO_CR_BUFSZ_1       = 0 <<  8,
+	SIO_CR_BUFSZ_2       = 1 <<  8,
+	SIO_CR_BUFSZ_4       = 2 <<  8,
+	SIO_CR_BUFSZ_8       = 3 <<  8,
+	SIO_CR_TXIEN         = 1 << 10,
+	SIO_CR_RXIEN         = 1 << 11,
+	SIO_CR_DSRIEN        = 1 << 12, // DSR is /ACK on SIO0
+	SIO_CR_PORT_BITMASK  = 1 << 13, // SIO0 only
+	SIO_CR_PORT_1        = 0 << 13, // SIO0 only
+	SIO_CR_PORT_2        = 1 << 13  // SIO0 only
+} SIOCRFlag;
 
-// SIO_DATA is a 32-bit register, but some emulators do not implement it
-// correctly and break if it's read more than 8 bits at a time.
-#define SIO_DATA(N) _MMIO8 ((IO_BASE | 0x040) + (16 * (N)))
-#define SIO_STAT(N) _MMIO16((IO_BASE | 0x044) + (16 * (N)))
-#define SIO_MODE(N) _MMIO16((IO_BASE | 0x048) + (16 * (N)))
-#define SIO_CTRL(N) _MMIO16((IO_BASE | 0x04a) + (16 * (N)))
-#define SIO_BAUD(N) _MMIO16((IO_BASE | 0x04e) + (16 * (N)))
+// SIO_DR is a 32-bit register, but some emulators do not implement it correctly
+// and break if it's read more than 8 bits at a time.
+#define SIO_DR(N) _MMIO8 ((IO_BASE | 0x040) + (16 * (N)))
+#define SIO_SR(N) _MMIO16((IO_BASE | 0x044) + (16 * (N)))
+#define SIO_MR(N) _MMIO16((IO_BASE | 0x048) + (16 * (N)))
+#define SIO_CR(N) _MMIO16((IO_BASE | 0x04a) + (16 * (N)))
+#define SIO_BR(N) _MMIO16((IO_BASE | 0x04e) + (16 * (N)))
 
 /* DRAM controller */
 
@@ -202,9 +213,9 @@ typedef enum {
 	DMA_CHCR_PAUSE            = 1 << 29  // Burst mode only
 } DMACHCRFlag;
 
-#define DMA_DPCR_CH_PRIORITY_BITMASK(N)   (7              << (4 * (N)))
-#define DMA_DPCR_CH_PRIORITY(N, priority) ((priority & 7) << (4 * (N)))
-#define DMA_DPCR_CH_ENABLE(N)             ((1 << 3)       << (4 * (N)))
+#define DMA_DPCR_CH_PRIORITY_BITMASK(ch) ((7 << 0)      << (4 * (ch)))
+#define DMA_DPCR_CH_PRIORITY(ch, value)  (((value) & 7) << (4 * (ch)))
+#define DMA_DPCR_CH_ENABLE(ch)           ((1 << 3)      << (4 * (ch)))
 
 typedef enum {
 	DMA_DICR_CH_MODE_BITMASK   = 0x7f <<  0,
@@ -215,9 +226,9 @@ typedef enum {
 	DMA_DICR_IRQ               =    1 << 31
 } DMADICRFlag;
 
-#define DMA_DICR_CH_MODE(N)   (1 << ((N) +  0))
-#define DMA_DICR_CH_ENABLE(N) (1 << ((N) + 16))
-#define DMA_DICR_CH_STAT(N)   (1 << ((N) + 24))
+#define DMA_DICR_CH_MODE(ch)   (1 << ((ch) +  0))
+#define DMA_DICR_CH_ENABLE(ch) (1 << ((ch) + 16))
+#define DMA_DICR_CH_STAT(ch)   (1 << ((ch) + 24))
 
 #define DMA_MADR(N) _MMIO32((IO_BASE | 0x080) + (16 * (N)))
 #define DMA_BCR(N)  _MMIO32((IO_BASE | 0x084) + (16 * (N)))
@@ -289,13 +300,6 @@ typedef enum {
 	CDROM_HCLRCTL_CLRPRM         = 1 << 6,
 	CDROM_HCLRCTL_CHPRST         = 1 << 7
 } CDROMHCLRCTLFlag;
-
-typedef enum {
-	CDROM_CI_SM       = 1 << 0,
-	CDROM_CI_FS       = 1 << 2,
-	CDROM_CI_BITLNGTH = 1 << 4,
-	CDROM_CI_EMPHASIS = 1 << 6
-} CDROMCIFlag;
 
 typedef enum {
 	CDROM_ADPCTL_ADPMUTE = 1 << 0,
@@ -393,6 +397,14 @@ typedef enum {
 	MDEC_CMD_OP_SET_IDCT_TABLE  =      3 << 29
 } MDECCommandFlag;
 
+#define MDEC_CMD_LENGTH(value) (((value) & 0xffff) << 0)
+
+typedef enum {
+	MDEC_CTRL_DMA_OUT_ENABLE = 1 << 29,
+	MDEC_CTRL_DMA_IN_ENABLE  = 1 << 30,
+	MDEC_CTRL_RESET          = 1 << 31
+} MDECControlFlag;
+
 typedef enum {
 	MDEC_STAT_LENGTH_BITMASK = 0xffff <<  0,
 	MDEC_STAT_BLOCK_BITMASK  =      7 << 16,
@@ -416,16 +428,58 @@ typedef enum {
 	MDEC_STAT_DATA_EMPTY     =      1 << 31
 } MDECStatusFlag;
 
-typedef enum {
-	MDEC_CTRL_DMA_OUT = 1 << 29,
-	MDEC_CTRL_DMA_IN  = 1 << 30,
-	MDEC_CTRL_RESET   = 1 << 31
-} MDECControlFlag;
-
-#define MDEC0 _MMIO32(IO_BASE | 0x820)
-#define MDEC1 _MMIO32(IO_BASE | 0x824)
+#define MDEC_DATA _MMIO32(IO_BASE | 0x820)
+#define MDEC_CTRL _MMIO32(IO_BASE | 0x824)
+#define MDEC_STAT _MMIO32(IO_BASE | 0x824)
 
 /* SPU */
+
+typedef enum {
+	SPU_VOL_SLIDE_STEP_BITMASK =  3 <<  0,
+	SPU_VOL_SLIDE_STEP_7       =  0 <<  0,
+	SPU_VOL_SLIDE_STEP_6       =  1 <<  0,
+	SPU_VOL_SLIDE_STEP_5       =  2 <<  0,
+	SPU_VOL_SLIDE_STEP_4       =  3 <<  0,
+	SPU_VOL_SLIDE_RATE_BITMASK = 31 <<  2,
+	SPU_VOL_SLIDE_NEG          =  1 << 12,
+	SPU_VOL_SLIDE_DEC          =  1 << 13,
+	SPU_VOL_SLIDE_EXP          =  1 << 14,
+	SPU_VOL_SLIDE_ENABLE       =  1 << 15
+} SPUVolumeSlideFlag;
+
+#define SPU_VOL_SLIDE_RATE(rate) (((rate) & 31) << 2)
+
+typedef enum {
+	SPU_ADSR1_SL_BITMASK    = 15 <<  0,
+	SPU_ADSR1_DR_BITMASK    = 15 <<  4,
+	SPU_ADSR1_ASTEP_BITMASK =  3 <<  8,
+	SPU_ADSR1_ASTEP_7       =  0 <<  8,
+	SPU_ADSR1_ASTEP_6       =  1 <<  8,
+	SPU_ADSR1_ASTEP_5       =  2 <<  8,
+	SPU_ADSR1_ASTEP_4       =  3 <<  8,
+	SPU_ADSR1_AR_BITMASK    = 31 << 10,
+	SPU_ADSR1_AEXP          =  1 << 15
+} SPUADSR1Flag;
+
+#define SPU_ADSR1_SL(level) (((level) & 15) <<  0)
+#define SPU_ADSR1_DR(rate)  (((rate)  & 15) <<  4)
+#define SPU_ADSR1_AR(rate)  (((rate)  & 31) << 10)
+
+typedef enum {
+	SPU_ADSR2_RR_BITMASK    = 31 <<  0,
+	SPU_ADSR2_REXP          =  1 <<  5,
+	SPU_ADSR1_SSTEP_BITMASK =  3 <<  6,
+	SPU_ADSR1_SSTEP_7       =  0 <<  6,
+	SPU_ADSR1_SSTEP_6       =  1 <<  6,
+	SPU_ADSR1_SSTEP_5       =  2 <<  6,
+	SPU_ADSR1_SSTEP_4       =  3 <<  6,
+	SPU_ADSR1_SR_BITMASK    = 31 <<  8,
+	SPU_ADSR2_SDEC          =  1 << 14,
+	SPU_ADSR2_SEXP          =  1 << 15
+} SPUADSR2Flag;
+
+#define SPU_ADSR2_RR(rate) (((rate) & 31) << 0)
+#define SPU_ADSR2_SR(rate) (((rate) & 31) << 8)
 
 typedef enum {
 	SPU_STATX_I2SA_ENABLE    = 1 <<  0,
@@ -500,7 +554,7 @@ typedef enum {
 #define SPU_ESA      _MMIO16(IO_BASE | 0xda2)
 #define SPU_IRQA     _MMIO16(IO_BASE | 0xda4)
 #define SPU_TSA      _MMIO16(IO_BASE | 0xda6)
-#define SPU_DATA     _MMIO16(IO_BASE | 0xda8)
+#define SPU_DATAX    _MMIO16(IO_BASE | 0xda8)
 #define SPU_ATTR     _MMIO16(IO_BASE | 0xdaa)
 #define SPU_RAM_CTRL _MMIO16(IO_BASE | 0xdac)
 #define SPU_STATX    _MMIO16(IO_BASE | 0xdae)
