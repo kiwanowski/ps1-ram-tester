@@ -28,7 +28,7 @@ include(cmake/options.cmake)
 include(cmake/setup.cmake)
 include(cmake/tools.cmake)
 
-## Standard library
+## C standard library
 
 add_library(
 	c OBJECT
@@ -37,7 +37,6 @@ add_library(
 	src/libc/misc.c
 	src/libc/string.c
 	src/libc/string.s
-	src/ps1/cache.s
 	src/vendor/printf.c
 )
 target_include_directories(
@@ -52,6 +51,7 @@ link_libraries(c)
 addPS1Executable(
 	"${RELEASE_NAME}"
 	"${RELEASE_INFO}"
+	src/common/cache.s
 	src/common/gpu.c
 	src/common/reboot.c
 	src/common/reboot.s

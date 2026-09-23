@@ -148,7 +148,7 @@ void printString(
 
 	GPUDMAChain *chain = getCurrentChain(ctx);
 
-	int currentX = x, currentY = y;
+	int offsetX = 0, offsetY = 0;
 
 	uint32_t *ptr;
 
@@ -160,17 +160,17 @@ void printString(
 
 		switch (ch) {
 			case '\t':
-				currentX += FONT_TAB_WIDTH - 1;
-				currentX -= currentX % FONT_TAB_WIDTH;
+				offsetX += FONT_TAB_WIDTH;
+				offsetX -= offsetX % FONT_TAB_WIDTH;
 				continue;
 
 			case '\n':
-				currentX  = x;
-				currentY += FONT_LINE_HEIGHT;
+				offsetX  = 0;
+				offsetY += FONT_LINE_HEIGHT;
 				continue;
 
 			case ' ':
-				currentX += FONT_SPACE_WIDTH;
+				offsetX += FONT_SPACE_WIDTH;
 				continue;
 
 			case FIRST_INVALID_CHAR ... 0xff:
@@ -182,7 +182,7 @@ void printString(
 
 		ptr    = allocateGP0Packet(chain, 4);
 		ptr[0] = color | gp0_rectangle(true, ch >> 7, true);
-		ptr[1] = gp0_xy(currentX, currentY);
+		ptr[1] = gp0_xy(x + offsetX, y + offsetY);
 		ptr[2] = gp0_uv(
 			ctx->font.u + sprite->x,
 			ctx->font.v + sprite->y,
@@ -190,7 +190,7 @@ void printString(
 		);
 		ptr[3] = gp0_xy(sprite->width, sprite->height);
 
-		currentX += sprite->width;
+		offsetX += sprite->width;
 	}
 }
 
@@ -198,26 +198,26 @@ int getStringWidth(const char *str) {
 	if (!str)
 		return 0;
 
-	int currentX = 0, maxWidth = 0;
+	int offsetX = 0, maxWidth = 0;
 
 	for (; *str; str++) {
 		uint8_t ch = (uint8_t) *str;
 
 		switch (ch) {
 			case '\t':
-				currentX += FONT_TAB_WIDTH - 1;
-				currentX -= currentX % FONT_TAB_WIDTH;
+				offsetX += FONT_TAB_WIDTH;
+				offsetX -= offsetX % FONT_TAB_WIDTH;
 				continue;
 
 			case '\n':
-				if (currentX > maxWidth)
-					maxWidth = currentX;
+				if (offsetX > maxWidth)
+					maxWidth = offsetX;
 
-				currentX = 0;
+				offsetX = 0;
 				continue;
 
 			case ' ':
-				currentX += FONT_SPACE_WIDTH;
+				offsetX += FONT_SPACE_WIDTH;
 				continue;
 
 			case FIRST_INVALID_CHAR ... 0xff:
@@ -226,11 +226,11 @@ int getStringWidth(const char *str) {
 		}
 
 		const SpriteInfo *sprite = &fontSprites[ch - FIRST_TABLE_CHAR];
-		currentX                += sprite->width;
+		offsetX                 += sprite->width;
 	}
 
-	if (currentX > maxWidth)
-		maxWidth = currentX;
+	if (offsetX > maxWidth)
+		maxWidth = offsetX;
 
 	return maxWidth;
 }

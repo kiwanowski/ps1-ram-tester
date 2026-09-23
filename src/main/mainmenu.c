@@ -144,7 +144,7 @@ static void runSPURAMTest(
 		&error,
 		testCallback,
 		ctx,
-		SPU_RAM_ALLOC_OFFSET,
+		SPU_SAMPLE_OFFSET,
 		size,
 		testPasses
 	)) {

@@ -23,9 +23,10 @@
 
 #define DMA_MAX_CHUNK_SIZE 16
 
-// This version of spu.c was modified from the one in ps1-bare-metal to make the
-// SPU RAM addressing unit configurable at runtime, in order to support SPU RAM
-// sizes larger than 512 KB.
+// This version of common/spu.c was modified from the one in ps1-bare-metal to
+// make the SPU RAM addressing unit configurable at runtime, in order to support
+// sizes larger than 512 KB. The dummy ADPCM block was also removed as it's not
+// needed here and would be overwritten anyway during SPU RAM testing.
 uint8_t spuRAMAddressShift = 3;
 
 void initSPU(void) {
@@ -36,31 +37,34 @@ void initSPU(void) {
 		| BIU_CTRL_WIDTH_16
 		| BIU_CTRL_AUTO_INCR
 		| BIU_CTRL_ADDR_BITS(9)
-		| BIU_CTRL_DMA_DELAY(2) // Required for SPU RAM readback
+		| BIU_CTRL_DMA_DELAY(0)
 		| BIU_CTRL_DMA_DELAY_ENABLE;
+	BIU_COM_DELAY = 0
+		| BIU_COM_DELAY_RECOVERY(5)
+		| BIU_COM_DELAY_HOLD(2)
+		| BIU_COM_DELAY_FLOAT(3)
+		| BIU_COM_DELAY_PRESTROBE(1);
 
-	SPU_ATTR = 0;
-
-	while (SPU_STATX & 0x07ff)
-		__asm__ volatile("");
-
-	SPU_MVOLL    = SPU_MAX_VOLUME;
-	SPU_MVOLR    = SPU_MAX_VOLUME;
-	SPU_EVOLL    = 0;
-	SPU_EVOLR    = 0;
-	SPU_ESA      = 0xfffe;
+	SPU_ATTR     = 0
+		| SPU_ATTR_XFER_NONE
+		| SPU_ATTR_ENABLE;
 	SPU_RAM_CTRL = 0
 		| SPU_RAM_CTRL_BANKS_1
 		| SPU_RAM_CTRL_SIZE_512KB;
-	SPU_ATTR     = 0
-		| SPU_ATTR_XFER_NONE
-		| SPU_ATTR_DAC_ENABLE
-		| SPU_ATTR_ENABLE;
-
-	stopAllSPUChannels();
+	SPU_MVOLL    = 0x3fff & ~SPU_VOL_SLIDE_ENABLE;
+	SPU_MVOLR    = 0x3fff & ~SPU_VOL_SLIDE_ENABLE;
+	SPU_EVOLL    = 0;
+	SPU_EVOLR    = 0;
+	SPU_ESA      = 0xfffe;
 
 	DMA_DPCR         |= DMA_DPCR_CH_ENABLE(DMA_SPU);
 	DMA_CHCR(DMA_SPU) = 0;
+
+	resetAllSPUChannels();
+	SPU_ATTR = 0
+		| SPU_ATTR_XFER_NONE
+		| SPU_ATTR_DAC_ENABLE
+		| SPU_ATTR_ENABLE;
 
 	spuRAMAddressShift = 3;
 }
@@ -69,9 +73,7 @@ void waitForSPUDMADone(void) {
 	while (DMA_CHCR(DMA_SPU) & DMA_CHCR_ENABLE)
 		__asm__ volatile("");
 
-	// A delay is required here in order to allow the SPU to flush its transfer
-	// FIFO to SPU RAM. This takes around 30 us when the FIFO is full.
-	delayMicroseconds(35);
+	delayMicroseconds(2 * DMA_MAX_CHUNK_SIZE);
 }
 
 void sendSPURAMData(const void *data, unsigned int offset, size_t length) {
@@ -92,17 +94,22 @@ void sendSPURAMData(const void *data, unsigned int offset, size_t length) {
 		assert(!(length % DMA_MAX_CHUNK_SIZE));
 	}
 
-	uint16_t ctrl = SPU_ATTR & ~SPU_ATTR_XFER_BITMASK;
-	SPU_ATTR      = ctrl;
+	uint16_t attr = SPU_ATTR & ~SPU_ATTR_XFER_BITMASK;
+	SPU_ATTR      = attr;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_NONE)
 		__asm__ volatile("");
 
-	SPU_TSA  = (uint16_t) (offset >> spuRAMAddressShift);
-	SPU_ATTR = ctrl | SPU_ATTR_XFER_DMA_WRITE;
+	SPU_TSA  = offset >> spuRAMAddressShift;
+	SPU_ATTR = attr | SPU_ATTR_XFER_DMA_WRITE;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_DMA_WRITE)
 		__asm__ volatile("");
+
+	// SPU RAM writes can be performed with the default bus configuration, while
+	// reads require slightly increasing DMA waitstates.
+	uint32_t ctrl = BIU_DEV4_CTRL & ~BIU_CTRL_DMA_DELAY_BITMASK;
+	BIU_DEV4_CTRL = ctrl          |  BIU_CTRL_DMA_DELAY(0);
 
 	DMA_MADR(DMA_SPU) = (uintptr_t) data;
 	DMA_BCR (DMA_SPU) = chunkSize | (numChunks << 16);
@@ -130,17 +137,20 @@ void receiveSPURAMData(void *data, unsigned int offset, size_t length) {
 		assert(!(length % DMA_MAX_CHUNK_SIZE));
 	}
 
-	uint16_t ctrl = SPU_ATTR & ~SPU_ATTR_XFER_BITMASK;
-	SPU_ATTR      = ctrl;
+	uint16_t attr = SPU_ATTR & ~SPU_ATTR_XFER_BITMASK;
+	SPU_ATTR      = attr;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_NONE)
 		__asm__ volatile("");
 
-	SPU_TSA  = (uint16_t) (offset >> spuRAMAddressShift);
-	SPU_ATTR = ctrl | SPU_ATTR_XFER_DMA_READ;
+	SPU_TSA  = offset >> spuRAMAddressShift;
+	SPU_ATTR = attr | SPU_ATTR_XFER_DMA_READ;
 
 	while ((SPU_STATX & SPU_STATX_XFER_BITMASK) != SPU_STATX_XFER_DMA_READ)
 		__asm__ volatile("");
+
+	uint32_t ctrl = BIU_DEV4_CTRL & ~BIU_CTRL_DMA_DELAY_BITMASK;
+	BIU_DEV4_CTRL = ctrl          |  BIU_CTRL_DMA_DELAY(2);
 
 	DMA_MADR(DMA_SPU) = (uintptr_t) data;
 	DMA_BCR (DMA_SPU) = chunkSize | (numChunks << 16);
@@ -150,22 +160,17 @@ void receiveSPURAMData(void *data, unsigned int offset, size_t length) {
 		| DMA_CHCR_ENABLE;
 }
 
-void stopAllSPUChannels(void) {
-	// Reset all channels and point them to the beginning of SPU RAM. This is
-	// not strictly required but useful when using the SPU's interrupt feature,
-	// as "stopped" channels will actually keep reading samples from memory and
-	// may accidentally trigger an IRQ.
-	// NOTE: doing this is technically invalid as the first 4 KB of SPU RAM
-	// contain PCM capture buffers rather than ADPCM samples, but it does not
-	// matter as we're also setting the pitch to zero.
+void resetAllSPUChannels(void) {
+	// Mute all channels and point them to the beginning of SPU RAM to avoid
+	// needing a dummy sample. Doing this is technically invalid as the first 4
+	// KB of SPU RAM contain PCM capture buffers rather than ADPCM samples, but
+	// it does not matter as we're also "freezing" them by setting the pitch to
+	// zero.
 	for (int i = 0; i < SPU_NUM_CHANNELS; i++) {
 		SPU_CH_VOLL (i) = 0;
 		SPU_CH_VOLR (i) = 0;
 		SPU_CH_PITCH(i) = 0;
 		SPU_CH_SSA  (i) = 0;
-		SPU_CH_ADSR1(i) = 0;
-		SPU_CH_ADSR2(i) = 0;
-		SPU_CH_LSAX (i) = 0;
 	}
 
 	SPU_PMON0 = 0;
@@ -175,12 +180,8 @@ void stopAllSPUChannels(void) {
 	SPU_EON0  = 0;
 	SPU_EON1  = 0;
 
-	// Key on all channels to force the current playback address to be updated,
-	// then key them off again.
 	SPU_KON0 = 0xffff;
 	SPU_KON1 = 0x00ff;
-	SPU_KOF0 = 0xffff;
-	SPU_KOF1 = 0x00ff;
 }
 
 int findFreeSPUChannel(void) {
@@ -190,4 +191,31 @@ int findFreeSPUChannel(void) {
 	}
 
 	return -1;
+}
+
+int playSample(unsigned int offset, unsigned int sampleRate, int16_t volume) {
+	int ch = findFreeSPUChannel();
+
+	if (ch >= 0) {
+		SPU_CH_VOLL (ch) = (volume / 2) & ~SPU_VOL_SLIDE_ENABLE;
+		SPU_CH_VOLR (ch) = (volume / 2) & ~SPU_VOL_SLIDE_ENABLE;
+		SPU_CH_PITCH(ch) = (sampleRate * SPU_PITCH_UNIT) / 44100;
+		SPU_CH_SSA  (ch) = offset >> spuRAMAddressShift;
+
+		SPU_CH_ADSR1(ch) = 0
+			| SPU_ADSR1_SL(15)
+			| SPU_ADSR1_DR(15)
+			| SPU_ADSR1_AR(0);
+		SPU_CH_ADSR2(ch) = 0
+			| SPU_ADSR2_RR(0)
+			| SPU_ADSR2_SR(0);
+		SPU_CH_ENVX (ch) = volume;
+
+		if (ch < 16)
+			SPU_KON0 = 1 << ch;
+		else
+			SPU_KON1 = 1 << (ch - 16);
+	}
+
+	return ch;
 }

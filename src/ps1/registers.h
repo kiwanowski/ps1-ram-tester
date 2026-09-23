@@ -67,6 +67,18 @@ typedef enum {
 #define BIU_CTRL_ADDR_BITS(value)   (((value) & 31) << 16)
 #define BIU_CTRL_DMA_DELAY(value)   (((value) & 15) << 24)
 
+typedef enum {
+	BIU_COM_DELAY_RECOVERY_BITMASK  = 15 <<  0,
+	BIU_COM_DELAY_HOLD_BITMASK      = 15 <<  4,
+	BIU_COM_DELAY_FLOAT_BITMASK     = 15 <<  8,
+	BIU_COM_DELAY_PRESTROBE_BITMASK = 15 << 12
+} BIUCommonDelayFlag;
+
+#define BIU_COM_DELAY_RECOVERY(value)  (((value) & 15) <<  0)
+#define BIU_COM_DELAY_HOLD(value)      (((value) & 15) <<  4)
+#define BIU_COM_DELAY_FLOAT(value)     (((value) & 15) <<  8)
+#define BIU_COM_DELAY_PRESTROBE(value) (((value) & 15) << 12)
+
 #define BIU_DEV0_ADDR _MMIO32(IO_BASE | 0x000) // PIO/arcade
 #define BIU_DEV8_ADDR _MMIO32(IO_BASE | 0x004) // PIO/debug
 #define BIU_DEV0_CTRL _MMIO32(IO_BASE | 0x008) // PIO/arcade
@@ -102,10 +114,10 @@ typedef enum {
 	SIO_MR_CHLEN_6       = 1 << 2,
 	SIO_MR_CHLEN_7       = 2 << 2,
 	SIO_MR_CHLEN_8       = 3 << 2,
-	SIO_MR_P_BITMASK     = 3 << 4,
-	SIO_MR_P_NONE        = 0 << 4,
-	SIO_MR_P_EVEN        = 1 << 4,
-	SIO_MR_P_ODD         = 3 << 4,
+	SIO_MR_PE            = 1 << 4,
+	SIO_MR_P_BITMASK     = 1 << 5,
+	SIO_MR_P_ODD         = 0 << 5,
+	SIO_MR_P_EVEN        = 1 << 5,
 	SIO_MR_SB_BITMASK    = 3 << 6, // SIO1 only
 	SIO_MR_SB_1          = 1 << 6, // SIO1 only
 	SIO_MR_SB_1_5        = 2 << 6, // SIO1 only
@@ -145,14 +157,14 @@ typedef enum {
 /* DRAM controller */
 
 typedef enum {
-	DRAM_CTRL_UNKNOWN1        = 1 <<  3,
+	DRAM_CTRL_BYTE_CAS        = 1 <<  3,
 	DRAM_CTRL_REFRESH_BITMASK = 3 <<  4,
 	DRAM_CTRL_REFRESH_256     = 0 <<  4,
 	DRAM_CTRL_REFRESH_320     = 1 <<  4,
 	DRAM_CTRL_REFRESH_384     = 2 <<  4,
 	DRAM_CTRL_REFRESH_448     = 3 <<  4,
 	DRAM_CTRL_FETCH_DELAY     = 1 <<  7,
-	DRAM_CTRL_UNKNOWN2        = 1 <<  8,
+	DRAM_CTRL_UNKNOWN         = 1 <<  8,
 	DRAM_CTRL_SIZE_BITMASK    = (1 << 9) | (1 << 11),
 	DRAM_CTRL_SIZE_1MB        = (0 << 9) | (0 << 11),
 	DRAM_CTRL_SIZE_2MB        = (0 << 9) | (1 << 11),
@@ -240,27 +252,27 @@ typedef enum {
 /* Timers */
 
 typedef enum {
-	TIMER_CTRL_ENABLE_SYNC     = 1 <<  0,
-	TIMER_CTRL_SYNC_BITMASK    = 3 <<  1,
-	TIMER_CTRL_SYNC_PAUSE      = 0 <<  1,
-	TIMER_CTRL_SYNC_RESET1     = 1 <<  1,
-	TIMER_CTRL_SYNC_RESET2     = 2 <<  1,
-	TIMER_CTRL_SYNC_PAUSE_ONCE = 3 <<  1,
-	TIMER_CTRL_RELOAD          = 1 <<  3,
-	TIMER_CTRL_IRQ_ON_RELOAD   = 1 <<  4,
-	TIMER_CTRL_IRQ_ON_OVERFLOW = 1 <<  5,
-	TIMER_CTRL_IRQ_REPEAT      = 1 <<  6,
-	TIMER_CTRL_IRQ_LATCH       = 1 <<  7,
-	TIMER_CTRL_EXT_CLOCK       = 1 <<  8,
-	TIMER_CTRL_PRESCALE        = 1 <<  9,
-	TIMER_CTRL_IRQ             = 1 << 10,
-	TIMER_CTRL_RELOADED        = 1 << 11,
-	TIMER_CTRL_OVERFLOWED      = 1 << 12
-} TimerControlFlag;
+	TIMER_MODE_GATF            = 1 <<  0,
+	TIMER_MODE_GATM_BITMASK    = 3 <<  1,
+	TIMER_MODE_GATM_GATE       = 0 <<  1,
+	TIMER_MODE_GATM_RESET      = 1 <<  1,
+	TIMER_MODE_GATM_GATE_RESET = 2 <<  1,
+	TIMER_MODE_GATM_GATE_ONCE  = 3 <<  1,
+	TIMER_MODE_ZRET            = 1 <<  3,
+	TIMER_MODE_CMP             = 1 <<  4,
+	TIMER_MODE_OVFL            = 1 <<  5,
+	TIMER_MODE_REPT            = 1 <<  6,
+	TIMER_MODE_LEVL            = 1 <<  7,
+	TIMER_MODE_EXTC            = 1 <<  8,
+	TIMER_MODE_PSCL            = 1 <<  9,
+	TIMER_MODE_INTF            = 1 << 10,
+	TIMER_MODE_EQUF            = 1 << 11,
+	TIMER_MODE_OVFF            = 1 << 12
+} TimerModeFlag;
 
-#define TIMER_VALUE(N)  _MMIO16((IO_BASE | 0x100) + (16 * (N)))
-#define TIMER_CTRL(N)   _MMIO16((IO_BASE | 0x104) + (16 * (N)))
-#define TIMER_RELOAD(N) _MMIO16((IO_BASE | 0x108) + (16 * (N)))
+#define TIMER_COUNT(N) _MMIO16((IO_BASE | 0x100) + (16 * (N)))
+#define TIMER_MODE(N)  _MMIO16((IO_BASE | 0x104) + (16 * (N)))
+#define TIMER_COMP(N)  _MMIO16((IO_BASE | 0x108) + (16 * (N)))
 
 /* CD-ROM drive */
 
@@ -306,77 +318,78 @@ typedef enum {
 	CDROM_ADPCTL_CHNGATV = 1 << 5
 } CDROMADPCTLFlag;
 
-#define CDROM_HSTS      _MMIO8(IO_BASE | 0x800) // All banks
-#define CDROM_RESULT    _MMIO8(IO_BASE | 0x801) // All banks
-#define CDROM_RDDATA    _MMIO8(IO_BASE | 0x802) // All banks
-#define CDROM_HINTMSK_R _MMIO8(IO_BASE | 0x803) // Bank 0
-#define CDROM_HINTSTS   _MMIO8(IO_BASE | 0x803) // Bank 1
+#define CDROM_HSTS      _MMIO8(IO_BASE | 0x800) // All banks, read
+#define CDROM_RESULT    _MMIO8(IO_BASE | 0x801) // All banks, read
+#define CDROM_RDDATA    _MMIO8(IO_BASE | 0x802) // All banks, read
+#define CDROM_HINTMSK_R _MMIO8(IO_BASE | 0x803) // Bank 0, read
+#define CDROM_HINTSTS   _MMIO8(IO_BASE | 0x803) // Bank 1, read
 
-#define CDROM_ADDRESS   _MMIO8(IO_BASE | 0x800) // All banks
-#define CDROM_COMMAND   _MMIO8(IO_BASE | 0x801) // Bank 0
-#define CDROM_PARAMETER _MMIO8(IO_BASE | 0x802) // Bank 0
-#define CDROM_HCHPCTL   _MMIO8(IO_BASE | 0x803) // Bank 0
-#define CDROM_WRDATA    _MMIO8(IO_BASE | 0x801) // Bank 1
-#define CDROM_HINTMSK_W _MMIO8(IO_BASE | 0x802) // Bank 1
-#define CDROM_HCLRCTL   _MMIO8(IO_BASE | 0x803) // Bank 1
-#define CDROM_CI        _MMIO8(IO_BASE | 0x801) // Bank 2
-#define CDROM_ATV0      _MMIO8(IO_BASE | 0x802) // Bank 2
-#define CDROM_ATV1      _MMIO8(IO_BASE | 0x803) // Bank 2
-#define CDROM_ATV2      _MMIO8(IO_BASE | 0x801) // Bank 3
-#define CDROM_ATV3      _MMIO8(IO_BASE | 0x802) // Bank 3
-#define CDROM_ADPCTL    _MMIO8(IO_BASE | 0x803) // Bank 3
+#define CDROM_ADDRESS   _MMIO8(IO_BASE | 0x800) // All banks, write
+#define CDROM_COMMAND   _MMIO8(IO_BASE | 0x801) // Bank 0, write
+#define CDROM_PARAMETER _MMIO8(IO_BASE | 0x802) // Bank 0, write
+#define CDROM_HCHPCTL   _MMIO8(IO_BASE | 0x803) // Bank 0, write
+#define CDROM_WRDATA    _MMIO8(IO_BASE | 0x801) // Bank 1, write
+#define CDROM_HINTMSK_W _MMIO8(IO_BASE | 0x802) // Bank 1, write
+#define CDROM_HCLRCTL   _MMIO8(IO_BASE | 0x803) // Bank 1, write
+#define CDROM_CI        _MMIO8(IO_BASE | 0x801) // Bank 2, write
+#define CDROM_ATV0      _MMIO8(IO_BASE | 0x802) // Bank 2, write
+#define CDROM_ATV1      _MMIO8(IO_BASE | 0x803) // Bank 2, write
+#define CDROM_ATV2      _MMIO8(IO_BASE | 0x801) // Bank 3, write
+#define CDROM_ATV3      _MMIO8(IO_BASE | 0x802) // Bank 3, write
+#define CDROM_ADPCTL    _MMIO8(IO_BASE | 0x803) // Bank 3, write
 
 /* GPU */
 
 typedef enum {
-	GP1_STAT_PAGE_X_BITMASK      = 15 <<  0, // GP0_CMD_TPAGE
-	GP1_STAT_PAGE_Y0             =  1 <<  4, // GP0_CMD_TPAGE
-	GP1_STAT_BLEND_BITMASK       =  3 <<  5, // GP0_CMD_TPAGE
-	GP1_STAT_BLEND_SEMITRANS     =  0 <<  5, // GP0_CMD_TPAGE
-	GP1_STAT_BLEND_ADD           =  1 <<  5, // GP0_CMD_TPAGE
-	GP1_STAT_BLEND_SUBTRACT      =  2 <<  5, // GP0_CMD_TPAGE
-	GP1_STAT_BLEND_DIV4_ADD      =  3 <<  5, // GP0_CMD_TPAGE
-	GP1_STAT_COLOR_BITMASK       =  3 <<  7, // GP0_CMD_TPAGE
-	GP1_STAT_COLOR_4BPP          =  0 <<  7, // GP0_CMD_TPAGE
-	GP1_STAT_COLOR_8BPP          =  1 <<  7, // GP0_CMD_TPAGE
-	GP1_STAT_COLOR_16BPP         =  2 <<  7, // GP0_CMD_TPAGE
-	GP1_STAT_DITHER              =  1 <<  9, // GP0_CMD_TPAGE
-	GP1_STAT_UNLOCK_FB           =  1 << 10, // GP0_CMD_TPAGE
-	GP1_STAT_SET_MASK            =  1 << 11, // GP0_CMD_FB_MASK
-	GP1_STAT_USE_MASK            =  1 << 12, // GP0_CMD_FB_MASK
-	GP1_STAT_DISP_FIELD_BITMASK  =  1 << 13,
-	GP1_STAT_DISP_FIELD_EVEN     =  0 << 13,
-	GP1_STAT_DISP_FIELD_ODD      =  1 << 13,
-	GP1_STAT_PAGE_Y1             =  1 << 15, // GP0_CMD_TPAGE
-	GP1_STAT_FB_HRES_BITMASK     =  7 << 16, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_VRES_BITMASK     =  1 << 19, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_VRES_256         =  0 << 19, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_VRES_512         =  1 << 19, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_MODE_BITMASK     =  1 << 20, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_MODE_NTSC        =  0 << 20, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_MODE_PAL         =  1 << 20, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_COLOR_BITMASK    =  1 << 21, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_COLOR_16BPP      =  0 << 21, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_COLOR_24BPP      =  1 << 21, // GP1_CMD_FB_MODE
-	GP1_STAT_FB_INTERLACE        =  1 << 22, // GP1_CMD_FB_MODE
-	GP1_STAT_DISP_BLANK          =  1 << 23, // GP1_CMD_DISP_BLANK
-	GP1_STAT_IRQ                 =  1 << 24,
-	GP1_STAT_DREQ                =  1 << 25,
-	GP1_STAT_CMD_READY           =  1 << 26,
-	GP1_STAT_READ_READY          =  1 << 27,
-	GP1_STAT_WRITE_READY         =  1 << 28,
-	GP1_STAT_DREQ_MODE_BITMASK   =  3 << 29, // GP1_CMD_DREQ_MODE
-	GP1_STAT_DREQ_MODE_NONE      =  0 << 29, // GP1_CMD_DREQ_MODE
-	GP1_STAT_DREQ_MODE_FIFO      =  1 << 29, // GP1_CMD_DREQ_MODE
-	GP1_STAT_DREQ_MODE_GP0_WRITE =  2 << 29, // GP1_CMD_DREQ_MODE
-	GP1_STAT_DREQ_MODE_GP0_READ  =  3 << 29, // GP1_CMD_DREQ_MODE
-	GP1_STAT_DRAW_FIELD_BITMASK  =  1 << 31,
-	GP1_STAT_DRAW_FIELD_EVEN     =  0 << 31,
-	GP1_STAT_DRAW_FIELD_ODD      =  1 << 31
-} GP1StatusFlag;
+	GPU_STAT_PAGE_X_BITMASK      = 15 <<  0, // GP0_CMD_TPAGE
+	GPU_STAT_PAGE_Y0             =  1 <<  4, // GP0_CMD_TPAGE
+	GPU_STAT_BLEND_BITMASK       =  3 <<  5, // GP0_CMD_TPAGE
+	GPU_STAT_BLEND_SEMITRANS     =  0 <<  5, // GP0_CMD_TPAGE
+	GPU_STAT_BLEND_ADD           =  1 <<  5, // GP0_CMD_TPAGE
+	GPU_STAT_BLEND_SUBTRACT      =  2 <<  5, // GP0_CMD_TPAGE
+	GPU_STAT_BLEND_DIV4_ADD      =  3 <<  5, // GP0_CMD_TPAGE
+	GPU_STAT_COLOR_BITMASK       =  3 <<  7, // GP0_CMD_TPAGE
+	GPU_STAT_COLOR_4BPP          =  0 <<  7, // GP0_CMD_TPAGE
+	GPU_STAT_COLOR_8BPP          =  1 <<  7, // GP0_CMD_TPAGE
+	GPU_STAT_COLOR_16BPP         =  2 <<  7, // GP0_CMD_TPAGE
+	GPU_STAT_DITHER              =  1 <<  9, // GP0_CMD_TPAGE
+	GPU_STAT_UNLOCK_FB           =  1 << 10, // GP0_CMD_TPAGE
+	GPU_STAT_SET_MASK            =  1 << 11, // GP0_CMD_FB_MASK
+	GPU_STAT_USE_MASK            =  1 << 12, // GP0_CMD_FB_MASK
+	GPU_STAT_DISP_FIELD_BITMASK  =  1 << 13,
+	GPU_STAT_DISP_FIELD_EVEN     =  0 << 13,
+	GPU_STAT_DISP_FIELD_ODD      =  1 << 13,
+	GPU_STAT_PAGE_Y1             =  1 << 15, // GP0_CMD_TPAGE
+	GPU_STAT_FB_HRES_BITMASK     =  7 << 16, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_VRES_BITMASK     =  1 << 19, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_VRES_256         =  0 << 19, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_VRES_512         =  1 << 19, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_MODE_BITMASK     =  1 << 20, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_MODE_NTSC        =  0 << 20, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_MODE_PAL         =  1 << 20, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_COLOR_BITMASK    =  1 << 21, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_COLOR_16BPP      =  0 << 21, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_COLOR_24BPP      =  1 << 21, // GP1_CMD_FB_MODE
+	GPU_STAT_FB_INTERLACE        =  1 << 22, // GP1_CMD_FB_MODE
+	GPU_STAT_DISP_BLANK          =  1 << 23, // GP1_CMD_DISP_BLANK
+	GPU_STAT_IRQ                 =  1 << 24,
+	GPU_STAT_DREQ                =  1 << 25,
+	GPU_STAT_CMD_READY           =  1 << 26,
+	GPU_STAT_READ_READY          =  1 << 27,
+	GPU_STAT_WRITE_READY         =  1 << 28,
+	GPU_STAT_DREQ_MODE_BITMASK   =  3 << 29, // GP1_CMD_DREQ_MODE
+	GPU_STAT_DREQ_MODE_NONE      =  0 << 29, // GP1_CMD_DREQ_MODE
+	GPU_STAT_DREQ_MODE_FIFO      =  1 << 29, // GP1_CMD_DREQ_MODE
+	GPU_STAT_DREQ_MODE_GP0_WRITE =  2 << 29, // GP1_CMD_DREQ_MODE
+	GPU_STAT_DREQ_MODE_GP0_READ  =  3 << 29, // GP1_CMD_DREQ_MODE
+	GPU_STAT_DRAW_FIELD_BITMASK  =  1 << 31,
+	GPU_STAT_DRAW_FIELD_EVEN     =  0 << 31,
+	GPU_STAT_DRAW_FIELD_ODD      =  1 << 31
+} GPUStatusFlag;
 
-#define GPU_GP0 _MMIO32(IO_BASE | 0x810)
-#define GPU_GP1 _MMIO32(IO_BASE | 0x814)
+#define GPU_GP0  _MMIO32(IO_BASE | 0x810)
+#define GPU_STAT _MMIO32(IO_BASE | 0x814) // Read
+#define GPU_GP1  _MMIO32(IO_BASE | 0x814) // Write
 
 /* MDEC */
 
@@ -429,8 +442,8 @@ typedef enum {
 } MDECStatusFlag;
 
 #define MDEC_DATA _MMIO32(IO_BASE | 0x820)
-#define MDEC_CTRL _MMIO32(IO_BASE | 0x824)
-#define MDEC_STAT _MMIO32(IO_BASE | 0x824)
+#define MDEC_STAT _MMIO32(IO_BASE | 0x824) // Read
+#define MDEC_CTRL _MMIO32(IO_BASE | 0x824) // Write
 
 /* SPU */
 
@@ -468,12 +481,12 @@ typedef enum {
 typedef enum {
 	SPU_ADSR2_RR_BITMASK    = 31 <<  0,
 	SPU_ADSR2_REXP          =  1 <<  5,
-	SPU_ADSR1_SSTEP_BITMASK =  3 <<  6,
-	SPU_ADSR1_SSTEP_7       =  0 <<  6,
-	SPU_ADSR1_SSTEP_6       =  1 <<  6,
-	SPU_ADSR1_SSTEP_5       =  2 <<  6,
-	SPU_ADSR1_SSTEP_4       =  3 <<  6,
-	SPU_ADSR1_SR_BITMASK    = 31 <<  8,
+	SPU_ADSR2_SSTEP_BITMASK =  3 <<  6,
+	SPU_ADSR2_SSTEP_7       =  0 <<  6,
+	SPU_ADSR2_SSTEP_6       =  1 <<  6,
+	SPU_ADSR2_SSTEP_5       =  2 <<  6,
+	SPU_ADSR2_SSTEP_4       =  3 <<  6,
+	SPU_ADSR2_SR_BITMASK    = 31 <<  8,
 	SPU_ADSR2_SDEC          =  1 << 14,
 	SPU_ADSR2_SEXP          =  1 << 15
 } SPUADSR2Flag;
@@ -554,7 +567,7 @@ typedef enum {
 #define SPU_ESA      _MMIO16(IO_BASE | 0xda2)
 #define SPU_IRQA     _MMIO16(IO_BASE | 0xda4)
 #define SPU_TSA      _MMIO16(IO_BASE | 0xda6)
-#define SPU_DATAX    _MMIO16(IO_BASE | 0xda8)
+#define SPU_DATA     _MMIO16(IO_BASE | 0xda8)
 #define SPU_ATTR     _MMIO16(IO_BASE | 0xdaa)
 #define SPU_RAM_CTRL _MMIO16(IO_BASE | 0xdac)
 #define SPU_STATX    _MMIO16(IO_BASE | 0xdae)

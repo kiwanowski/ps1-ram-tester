@@ -16,7 +16,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "ps1/cache.h"
+#include "common/cache.h"
 #include "ps1/cop0.h"
 #include "ps1/gpucmd.h"
 #include "ps1/registers.h"

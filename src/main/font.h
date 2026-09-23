@@ -21,7 +21,7 @@
 #include "main/renderer.h"
 
 #define FONT_SPACE_WIDTH  4
-#define FONT_TAB_WIDTH   32
+#define FONT_TAB_WIDTH   64
 #define FONT_LINE_HEIGHT 10
 
 #ifdef __cplusplus

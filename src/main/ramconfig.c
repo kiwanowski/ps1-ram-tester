@@ -29,8 +29,8 @@
 typedef struct {
 	uint8_t valid;
 	uint8_t bankSize, banks;
-	uint8_t refreshPeriod, fetchDelay;
-	uint8_t unknown0, unknown3, unknown6, unknown8, unknown12;
+	uint8_t byteCAS, refreshPeriod, fetchDelay;
+	uint8_t unknown0, unknown6, unknown8, unknown12;
 } MainRAMConfig;
 
 static void setMainRAMConfig(const MainRAMConfig *config) {
@@ -38,7 +38,7 @@ static void setMainRAMConfig(const MainRAMConfig *config) {
 
 	uint32_t value = 0
 		| (config->unknown0       <<  0)
-		| (config->unknown3       <<  3)
+		| (config->byteCAS        <<  3)
 		| (config->refreshPeriod  <<  4)
 		| (config->unknown6       <<  6)
 		| (config->fetchDelay     <<  7)
@@ -57,7 +57,7 @@ static void getMainRAMConfig(MainRAMConfig *config) {
 	LOG("current value: 0x%04x", value & 0xffff);
 
 	config->unknown0      = (value >>  0) &  7;
-	config->unknown3      = (value >>  3) &  1;
+	config->byteCAS       = (value >>  3) &  1;
 	config->refreshPeriod = (value >>  4) &  3;
 	config->unknown6      = (value >>  6) &  1;
 	config->fetchDelay    = (value >>  7) &  1;
@@ -152,6 +152,18 @@ static const MenuItem ramConfigMenu[] = {
 	}, {
 		.type = ITEM_SEPARATOR
 	}, {
+		.name      = "/CAS and /WE wiring",
+		.type      = ITEM_ENUM,
+		.minValue  = 0,
+		.maxValue  = 1,
+		.enum_     = {
+			.value = &currentConfig.byteCAS,
+			.items = (const char *const[]) {
+				"Common /CAS, per-byte /WE",
+				"Per-byte /CAS, common /WE"
+			}
+		}
+	}, {
 		.name     = "Refresh period",
 		.type     = ITEM_ENUM,
 		.minValue = 0,
@@ -186,13 +198,6 @@ static const MenuItem ramConfigMenu[] = {
 		.maxValue  = 7,
 		.bitLength = 3,
 		.int_      = { .value = &currentConfig.unknown0 }
-	}, {
-		.name      = "Unknown DRAM_CTRL[3] (timing?)",
-		.type      = ITEM_BINARY,
-		.minValue  = 0,
-		.maxValue  = 1,
-		.bitLength = 1,
-		.int_      = { .value = &currentConfig.unknown3 }
 	}, {
 		.name      = "Unknown DRAM_CTRL[6]",
 		.type      = ITEM_BINARY,

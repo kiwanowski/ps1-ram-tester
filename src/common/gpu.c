@@ -59,12 +59,14 @@ void setupGPU(
 }
 
 void waitForGP0Ready(void) {
-	while (!(GPU_GP1 & GP1_STAT_WRITE_READY))
+	while (!(GPU_STAT & GPU_STAT_WRITE_READY))
 		__asm__ volatile("");
 }
 
 void waitForGPUDMADone(void) {
 	while (DMA_CHCR(DMA_GPU) & DMA_CHCR_ENABLE)
+		__asm__ volatile("");
+	while (!(GPU_STAT & GPU_STAT_WRITE_READY))
 		__asm__ volatile("");
 }
 
