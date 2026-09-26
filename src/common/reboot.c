@@ -94,13 +94,13 @@ static void performFastReboot(void) {
 	// port. As all parallel port cartridges use 8-bit ROMs, this will prevent
 	// the BIOS from successfully reading the magic string from one if present,
 	// thus disabling any cartridge hooks that may interfere with ours.
-	BIU_DEV0_CTRL = 0
-		| BIU_CTRL_WRITE_DELAY(15)
-		| BIU_CTRL_READ_DELAY(3)
-		| BIU_CTRL_FLOAT
-		| BIU_CTRL_WIDTH_16
-		| BIU_CTRL_AUTO_INCR
-		| BIU_CTRL_ADDR_BITS(19);
+	BIU_DEV0_DELAY = 0
+		| BIU_DEV_DELAY_WRITE_CYCLES(15)
+		| BIU_DEV_DELAY_READ_CYCLES(3)
+		| BIU_DEV_DELAY_FLOAT
+		| BIU_DEV_DELAY_WIDTH_16
+		| BIU_DEV_DELAY_AUTO_INCR
+		| BIU_DEV_DELAY_ADDR_BITS(19);
 
 	// Once the breakpoint is configured, jump to the middle of the BIOS entry
 	// point in order to skip the aforementioned initialization code.

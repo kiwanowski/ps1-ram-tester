@@ -29,20 +29,21 @@
 typedef struct {
 	uint8_t valid;
 	uint8_t bankSize, banks;
-	uint8_t byteCAS, refreshPeriod, fetchDelay;
-	uint8_t unknown0, unknown6, unknown8, unknown12;
+	uint8_t byteCAS, refreshPeriod, refreshTimeout, accessDelay;
+	uint8_t unknown6, unknown12;
 } MainRAMConfig;
 
 static void setMainRAMConfig(const MainRAMConfig *config) {
 	assert(config->valid);
 
+	// TODO: add support for different /RAS0 and /RAS1 bank sizes
 	uint32_t value = 0
-		| (config->unknown0       <<  0)
+		| (config->refreshTimeout <<  0)
 		| (config->byteCAS        <<  3)
 		| (config->refreshPeriod  <<  4)
 		| (config->unknown6       <<  6)
-		| (config->fetchDelay     <<  7)
-		| (config->unknown8       <<  8)
+		| (config->accessDelay    <<  7)
+		| ((config->bankSize & 2) <<  7)
 		| ((config->bankSize & 2) <<  8)
 		| (config->banks          << 10)
 		| ((config->bankSize & 1) << 11)
@@ -56,17 +57,16 @@ static void getMainRAMConfig(MainRAMConfig *config) {
 	uint32_t value = DRAM_CTRL;
 	LOG("current value: 0x%04x", value & 0xffff);
 
-	config->unknown0      = (value >>  0) &  7;
-	config->byteCAS       = (value >>  3) &  1;
-	config->refreshPeriod = (value >>  4) &  3;
-	config->unknown6      = (value >>  6) &  1;
-	config->fetchDelay    = (value >>  7) &  1;
-	config->unknown8      = (value >>  8) &  1;
-	config->bankSize      = (value >>  8) &  2;
-	config->banks         = (value >> 10) &  1;
-	config->bankSize     |= (value >> 11) &  1;
-	config->unknown12     = (value >> 12) & 15;
-	config->valid         = true;
+	config->refreshTimeout = (value >>  0) &  7;
+	config->byteCAS        = (value >>  3) &  1;
+	config->refreshPeriod  = (value >>  4) &  3;
+	config->unknown6       = (value >>  6) &  1;
+	config->accessDelay    = (value >>  7) &  1;
+	config->bankSize       = (value >>  8) &  2;
+	config->banks          = (value >> 10) &  1;
+	config->bankSize      |= (value >> 11) &  1;
+	config->unknown12      = (value >> 12) & 15;
+	config->valid          = true;
 }
 
 size_t getMainRAMSize(void) {
@@ -178,26 +178,37 @@ static const MenuItem ramConfigMenu[] = {
 			}
 		}
 	}, {
-		.name     = "Fetch conflict delay",
+		.name     = "Pending refresh timeout",
+		.type     = ITEM_ENUM,
+		.minValue = 0,
+		.maxValue = 7,
+		.enum_    = {
+			.value = &currentConfig.refreshTimeout,
+			.items = (const char *const[]) {
+				"Refresh immediately",
+				"4 cycles",
+				"8 cycles",
+				"16 cycles",
+				"32 cycles",
+				"64 cycles",
+				"128 cycles",
+				"Unlimited"
+			}
+		}
+	}, {
+		.name     = "Consecutive access delay",
 		.type     = ITEM_ENUM,
 		.minValue = 0,
 		.maxValue = 1,
 		.enum_    = {
-			.value = &currentConfig.fetchDelay,
+			.value = &currentConfig.accessDelay,
 			.items = (const char *const[]) {
-				"Disabled",
-				"Enabled"
+				"None",
+				"1 cycle"
 			}
 		}
 	}, {
 		.type = ITEM_SEPARATOR
-	}, {
-		.name      = "Unknown DRAM_CTRL[2:0]",
-		.type      = ITEM_BINARY,
-		.minValue  = 0,
-		.maxValue  = 7,
-		.bitLength = 3,
-		.int_      = { .value = &currentConfig.unknown0 }
 	}, {
 		.name      = "Unknown DRAM_CTRL[6]",
 		.type      = ITEM_BINARY,
@@ -205,13 +216,6 @@ static const MenuItem ramConfigMenu[] = {
 		.maxValue  = 1,
 		.bitLength = 1,
 		.int_      = { .value = &currentConfig.unknown6 }
-	}, {
-		.name      = "Unknown DRAM_CTRL[8] (size?)",
-		.type      = ITEM_BINARY,
-		.minValue  = 0,
-		.maxValue  = 1,
-		.bitLength = 1,
-		.int_      = { .value = &currentConfig.unknown8 }
 	}, {
 		.name      = "Unknown DRAM_CTRL[15:12]",
 		.type      = ITEM_BINARY,
