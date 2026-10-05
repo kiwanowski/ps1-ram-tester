@@ -24,7 +24,6 @@
 #include "main/renderer.h"
 #include "main/ui.h"
 #include "ps1/gpucmd.h"
-#include "ps1/registers.h"
 
 #define SCREEN_HRES   GP1_HRES_320
 #define SCREEN_VRES   GP1_VRES_256
@@ -47,7 +46,7 @@ int main(int argc, const char **argv) {
 
 	setupGPU(mode, SCREEN_HRES, SCREEN_VRES, SCREEN_WIDTH, SCREEN_HEIGHT);
 	initSPU();
-	initControllerBus();
+	initSIO0();
 	fixRetailRAMConfig();
 
 	static RenderContext ctx;

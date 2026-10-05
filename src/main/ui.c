@@ -19,11 +19,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "common/sio0.h"
 #include "main/defs.h"
 #include "main/font.h"
 #include "main/renderer.h"
 #include "main/ui.h"
+#include "ps1/ctpdef.h"
 
 #define MARGIN_LEFT   16
 #define MARGIN_RIGHT  16
@@ -255,7 +255,7 @@ void updateMenu(RenderContext *ctx, UIState *state, uint16_t buttons) {
 
 	switch (item->type) {
 		case ITEM_ACTION:
-			if (pressed & (PAD_BTN_START | PAD_BTN_CIRCLE | PAD_BTN_CROSS))
+			if (pressed & (BTN_PAD_START | BTN_PAD_CIRCLE | BTN_PAD_CROSS))
 				item->action.callback(ctx, state, item);
 			break;
 
@@ -267,18 +267,18 @@ void updateMenu(RenderContext *ctx, UIState *state, uint16_t buttons) {
 			value = *item->int_.value;
 
 			if (value > item->minValue) {
-				if (repeating & PAD_BTN_LEFT)
+				if (repeating & BTN_PAD_LEFT)
 					*item->int_.value = value - 1;
 			} else {
-				if (pressed & PAD_BTN_LEFT)
+				if (pressed & BTN_PAD_LEFT)
 					*item->int_.value = item->maxValue;
 			}
 
 			if (value < item->maxValue) {
-				if (repeating & PAD_BTN_RIGHT)
+				if (repeating & BTN_PAD_RIGHT)
 					*item->int_.value = value + 1;
 			} else {
-				if (pressed & PAD_BTN_RIGHT)
+				if (pressed & BTN_PAD_RIGHT)
 					*item->int_.value = item->minValue;
 			}
 			break;
@@ -291,9 +291,9 @@ void updateMenu(RenderContext *ctx, UIState *state, uint16_t buttons) {
 	uint16_t upMask   = !state->menuCursor         ? pressed : repeating;
 	uint16_t downMask = (item[1].type == ITEM_END) ? pressed : repeating;
 
-	if (upMask   & PAD_BTN_UP)
+	if (upMask   & BTN_PAD_UP)
 		moveMenuCursor(state, -1);
-	if (downMask & PAD_BTN_DOWN)
+	if (downMask & BTN_PAD_DOWN)
 		moveMenuCursor(state,  1);
 }
 
